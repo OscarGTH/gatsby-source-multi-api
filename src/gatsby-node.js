@@ -1,23 +1,27 @@
-const fetch = require('node-fetch')
+const axios = require('axios')
+const nUrl = require('url');
 exports.sourceNodes = (
   { actions, createNodeId, createContentDigest },
-  configOptions
+  configmethod
 ) => {
   const { createNode } = actions
-  const { apis } = configOptions
+  const { apis } = configmethod
 
   // Gatsby adds a configOption that's not needed for this plugin, delete it
-  delete configOptions.plugins
+  delete configmethod.plugins
 
   const sources = []
 
   // Helper function that processes a result to match Gatsby's node structure
   const processResult = ({ result, endpoint, prefix }) => {
-    const nodeId = createNodeId(`${endpoint}-${result.id}`)
+    const genId = result.id ? result.id : Math.floor(Math.random() * 1000000000);
+    const nodeId = createNodeId(`${endpoint}-${genId}`)
     const nodeContent = JSON.stringify(result)
     const nodeData = Object.assign({}, result, {
       id: nodeId,
       endpointId: result.id,
+      endpoint_children: result.children,
+      endpoint_parent: result.parent,
       parent: null,
       children: [],
       internal: {
@@ -26,13 +30,12 @@ exports.sourceNodes = (
         contentDigest: createContentDigest(result),
       },
     })
-
     return nodeData
   }
 
-  const appendSources = ({ url, endpoint, prefix, method }) => {
+  const appendSources = ({ url, endpoint, prefix, method, headers }) => {
     sources.push(
-      fetchData(url, { method })
+      fetchData(url, { method, headers })
         .then(data => {
           if (Array.isArray(data)) {
             /* if fetchData returns multiple results */
@@ -61,9 +64,9 @@ exports.sourceNodes = (
   apis.forEach(api => {
     /* check if the api request is an object with parameters */
     if (typeof api === 'object') {
-      const { prefix, baseUrl, endpoints, method = 'GET' } = api
+      const { prefix, baseUrl, endpoints, method = 'GET', headers } = api
 
-      /* Add some error logging if required config options are mising */
+      /* Add some error logging if required config method are mising */
       if (!baseUrl) {
         console.log('\x1b[31m')
         console.error(
@@ -84,6 +87,7 @@ exports.sourceNodes = (
             endpoint,
             prefix,
             method,
+            headers
           })
         })
         return
@@ -95,11 +99,12 @@ exports.sourceNodes = (
         endpoint: baseUrl,
         prefix,
         method,
+        headers
       })
       return
     }
 
-    /* The default simply expects a api url as a string and no other options */
+    /* The default simply expects a api url as a string and no other method */
     if (typeof api === 'string') {
       if (api.length) {
         appendSources({
@@ -117,8 +122,10 @@ exports.sourceNodes = (
 
 // Helper function to fetch data
 const fetchData = async (url, options = {}) => {
-  const response = await fetch(`${url}`, options)
-  return await response.json()
+  const path = encodeURI(url);
+  console.log("fetching from: " + path)
+  const response = await axios.get(path)
+  return await response.data["hydra:member"]
 }
 
 //strips special characters and makes string camelcase
@@ -130,3 +137,4 @@ const customFormat = str => {
     .replace(/\-+/g, '') //Removes hyphens
     .replace(/\s+/g, '') //Removes spaces
 }
+
