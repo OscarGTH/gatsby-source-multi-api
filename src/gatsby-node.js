@@ -1,5 +1,4 @@
 const axios = require('axios')
-const nUrl = require('url');
 exports.sourceNodes = (
   { actions, createNodeId, createContentDigest },
   configmethod
@@ -123,9 +122,8 @@ exports.sourceNodes = (
 // Helper function to fetch data
 const fetchData = async (url, options = {}) => {
   const path = encodeURI(url);
-  console.log("fetching from: " + path)
   const response = await axios.get(path)
-  return await response.data["hydra:member"]
+  return await response.data
 }
 
 //strips special characters and makes string camelcase
